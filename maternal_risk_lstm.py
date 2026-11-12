@@ -36,30 +36,63 @@ def fetch_mendeley_dataset(local_fallback="maternal_health_mendeley.csv"):
         print(f"Loading cached dataset from {local_fallback}...")
         return pd.read_csv(local_fallback)
 
-    api_url = "https://data.mendeley.com/public-api/datasets/ckhgtgdg4f/files?folder_id=root"
-    print("Fetching dataset metadata from Mendeley Data API...")
-    resp = requests.get(api_url, timeout=30)
-    resp.raise_for_status()
-    files = resp.json()
+    # Prefer the documented public endpoint; retain older endpoint as fallback.
+    api_endpoints = [
+        "https://api.data.mendeley.com/datasets/publics/ckhgtgdg4f/files?version=1",
+        "https://api.data.mendeley.com/datasets/ckhgtgdg4f/files?version=1",
+        "https://data.mendeley.com/public-api/datasets/ckhgtgdg4f/files?folder_id=root",
+    ]
+    last_error = None
+    df = None
 
-    # Locate the tabular CSV/Excel file in the dataset repository
-    target_file = next(
-        (f for f in files if f["filename"].lower().endswith((".csv", ".xlsx", ".xls"))),
-        None,
-    )
-    if not target_file:
-        raise FileNotFoundError("No CSV or Excel file found in Mendeley dataset.")
+    for api_url in api_endpoints:
+        try:
+            print(f"Checking dataset source: {api_url}")
+            resp = requests.get(api_url, timeout=30)
+            resp.raise_for_status()
+            payload = resp.json()
+            files = payload if isinstance(payload, list) else payload.get(
+                "results", payload.get("files", [])
+            )
+            if isinstance(files, dict):
+                files = files.get("results", [])
+            target_file = next(
+                (item for item in files
+                 if isinstance(item, dict) and
+                 item.get("filename", "").lower().endswith((".csv", ".xlsx", ".xls"))),
+                None,
+            )
+            if target_file is None:
+                raise FileNotFoundError("No CSV or Excel listed by the dataset API.")
 
-    download_url = target_file["content_details"]["download_url"]
-    filename = target_file["filename"]
-    print(f"Downloading {filename}...")
-    file_resp = requests.get(download_url, timeout=60)
-    file_resp.raise_for_status()
-
-    if filename.lower().endswith(".csv"):
-        df = pd.read_csv(io.BytesIO(file_resp.content))
-    else:
-        df = pd.read_excel(io.BytesIO(file_resp.content))
+            filename = target_file["filename"]
+            details = target_file.get("content_details") or {}
+            download_url = details.get("download_url")
+            if not download_url:
+                file_id = target_file.get("id")
+                if not file_id:
+                    raise ValueError("Dataset file metadata has no download URL or ID.")
+                download_url = (
+                    "https://api.data.mendeley.com/datasets/ckhgtgdg4f/files/"
+                    f"{file_id}/file_downloaded?version=1"
+                )
+            file_resp = requests.get(download_url, timeout=60)
+            file_resp.raise_for_status()
+            if filename.lower().endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(file_resp.content))
+            else:
+                df = pd.read_excel(io.BytesIO(file_resp.content))
+            break
+        except (requests.RequestException, ValueError, KeyError,
+                FileNotFoundError, pd.errors.ParserError) as exc:
+            last_error = exc
+            print(f"Dataset source unavailable: {type(exc).__name__}")
+    if df is None:
+        raise RuntimeError(
+            "Automatic dataset download failed. Download Mathernal_Risk.csv "
+            "from https://data.mendeley.com/datasets/ckhgtgdg4f/1 and "
+            "save it as maternal_health_mendeley.csv in the working folder."
+        ) from last_error
 
     df.to_csv(local_fallback, index=False)
     print(f"Saved local copy to {local_fallback} ({len(df)} rows).")
