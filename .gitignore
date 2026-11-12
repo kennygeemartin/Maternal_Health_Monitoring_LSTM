@@ -1,0 +1,14 @@
+# Source dataset contains names and identifiers; never commit it.
+maternal_health_mendeley.csv
+*.xlsx
+*.xls
+# Python environments / generated artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.pt
+*.pth
+.env
