@@ -2,6 +2,12 @@
 
 Research implementation of an LSTM-based classifier for maternal health risk prediction (Low / Mid / High), using the [Maternal Health Risk dataset](https://data.mendeley.com/datasets/ckhgtgdg4f/1) (Hossain, 2025, DOI: 10.17632/ckhgtgdg4f.1). The source dataset contains 6,103 IoT-collected records from healthcare centres in Bangladesh.
 
+[![Open in Google Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kennygeemartin/Maternal_Health_Monitoring_LSTM/blob/main/Maternal_Health_LSTM_Colab.ipynb)
+
+## Run in Google Colab
+
+Open the notebook with the badge above and select **Runtime → Run all**. The notebook installs dependencies, loads the Mendeley dataset (with a private upload fallback), trains the model, reports aggregate test metrics and offers a text report for download. No local Python installation is needed.
+
 ## Model
 
 - Eight clinical features (Age, Body Temperature, Heart Rate, Systolic BP, Diastolic BP, BMI, HbA1c, Fasting Glucose) serialised into an 8-step feature sequence: `(N, 8, 1)`. These are **static feature positions, not longitudinal time steps**.
